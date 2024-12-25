@@ -1,0 +1,18 @@
+analizy.pl
+https://www.analizy.pl/ratingi?&segment[]=AK&ratingOd=4&ratingDo=5&page=1&
+
+BNP Paribas TFI - BNP Paribas Małych i Średnich Spółek
+https://www.tfi.bnpparibas.pl/dokumenty,sklady-portfeli.html
+https://www.tfi.bnpparibas.pl/dl/6379/attachment/83df57/BNP_Paribas_TFI_sklady-portfeli-funduszy_3Q2024.xlsx
+
+Quercus TFI - QUERCUS Agresywny
+https://quercustfi.pl/strona/quercus-parasolowy-sfio
+https://quercustfi.pl/sites/default/files/pliki/PUBLIKACJE/sklady_portfeli/quercus_sklady_portfeli_2024.zip
+
+Santander TFI - Santander Akcji Małych i Średnich Spółek, Santander Prestiż Alfa
+https://www.santander.pl/tfi/dokumenty
+https://www.santander.pl/regulation_file_server/time20241216093902/download?id=160948&lang=pl_PL
+
+UNIQA TFI - UNIQA Selektywny Akcji Polskich
+https://www.uniqa.pl/emerytura-i-inwestycje/dokumenty/uniqa-fio/
+https://www.uniqa.pl/files/user_upload/Publikacja_portfela_FIO_20240930.pdf
