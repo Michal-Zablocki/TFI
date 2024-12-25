@@ -1,8 +1,12 @@
-from decimal import Decimal, ROUND_HALF_UP
+import decimal
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+
 import tabula
+
+decimal.getcontext().rounding = decimal.ROUND_HALF_UP
 
 
 def paribas():
@@ -19,6 +23,7 @@ def paribas():
 
     df = df[df["Nazwa subfunduszu"] == fund_name]
     df = df[df["Typ instrumentu"] == "Akcje"]
+    df = df[df["Waluta wykorzystywana do wyceny instrumentu"] == "PLN"]
     print(df.shape)
     df = df[
         [
@@ -27,7 +32,6 @@ def paribas():
             "Data wyceny",
             "Nazwa emitenta",
             "Identyfikator instrumentu - kod ISIN",
-            "Waluta wykorzystywana do wyceny instrumentu",
             "Procentowy udział w Aktywach ogółem",
         ]
     ]
@@ -47,10 +51,13 @@ def paribas():
             "Data wyceny": "Data",
             "Nazwa emitenta": "Nazwa spółki",
             "Identyfikator instrumentu - kod ISIN": "ID instrumentu",
-            "Waluta wykorzystywana do wyceny instrumentu": "Waluta",
             "Procentowy udział w Aktywach ogółem": "Udział [%]",
         },
         inplace=True,
+    )
+
+    df["Udział [%]"] = df["Udział [%]"].apply(
+        lambda x: float(decimal.Decimal(x).quantize(decimal.Decimal("0.01")))
     )
 
     Path("data/output").mkdir(parents=True, exist_ok=True)
@@ -74,7 +81,7 @@ def quercus():
     df = df[df["WALUTA"] == "PLN"]
     print(df.shape)
 
-    df["ID Funduszu"] = "quercus_agresywny"
+    df["ID funduszu"] = "quercus_agresywny"
     df["Data"] = "2024-09-30"
     df.rename(
         {
@@ -82,25 +89,26 @@ def quercus():
             "EMITENT": "Nazwa spółki",
             "KOD PAPIERU": "ID instrumentu",
             "UDZIAŁ % W AKTYWACH": "Udział [%]",
-            "WALUTA": "Waluta",
         },
         axis=1,
         inplace=True,
     )
     df = df[
         [
-            "ID Funduszu",
+            "ID funduszu",
             "Nazwa funduszu",
             "Data",
             "Nazwa spółki",
             "ID instrumentu",
-            "Waluta",
             "Udział [%]",
         ]
     ]
 
     assets_perc_sum = df["Udział [%]"].sum()
     df["Udział [%]"] = df["Udział [%]"] / assets_perc_sum * 100
+    df["Udział [%]"] = df["Udział [%]"].apply(
+        lambda x: float(decimal.Decimal(x).quantize(decimal.Decimal("0.01")))
+    )
     df.sort_values(by="Udział [%]", ascending=False, inplace=True)
 
     Path("data/output").mkdir(parents=True, exist_ok=True)
@@ -113,7 +121,6 @@ def santander():
         "data/input/Santander TFI _ Bieżące składy portfela_pl_1697446468261.xlsx"
     )
     sheet_name = "Zestawienie"
-    fund_name = "Santander Akcji Małych i Średnich Spółek"
 
     df = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=1)
 
@@ -121,53 +128,64 @@ def santander():
         columns=lambda x: x.replace("\n", " ").replace("  ", " ").strip(), inplace=True
     )
 
-    df = df[df["Nazwa subfunduszu"] == fund_name]
-    df = df[df["Typ instrumentu"] == "Akcje"]
-    df = df[df["Waluta wykorzystywana do wyceny instrumentu"] == "PLN"]
-    df = df[df["Waluta wyceny aktywów i zobowiązań funduszu"] == "PLN"]
-    print(df.shape)
-
     df_tmp = pd.read_excel(file_path, sheet_name="Zestawienie")
     columns = df_tmp.columns.tolist()
     report_date = columns[2].strftime("%Y-%m-%d")
-    df["Data wyceny"] = report_date
 
-    df = df[
-        [
-            "Standardowy identyfikator subfunduszu",
-            "Nazwa subfunduszu",
-            "Data wyceny",
-            "Nazwa emitenta",
-            "Identyfikator instrumentu - kod ISIN",
-            "Waluta wykorzystywana do wyceny instrumentu",
-            "Wartość instrumentu w walucie wyceny funduszu",
+    fund_dict = {
+        "MiŚ": "Santander Akcji Małych i Średnich Spółek",
+        "Alfa": "Santander Prestiż Alfa",
+    }
+
+    for fund_key, fund_val in fund_dict.items():
+        fund_df = df[df["Nazwa subfunduszu"] == fund_val]
+        fund_df = fund_df[fund_df["Typ instrumentu"] == "Akcje"]
+        fund_df = fund_df[
+            fund_df["Waluta wykorzystywana do wyceny instrumentu"] == "PLN"
         ]
-    ]
-    assets_value = df["Wartość instrumentu w walucie wyceny funduszu"].sum()
+        print(fund_df.shape)
 
-    df["Procentowy udział w Aktywach ogółem"] = df[
-        "Wartość instrumentu w walucie wyceny funduszu"
-    ].apply(lambda x: x / assets_value * 100)
-    df.sort_values(
-        by="Procentowy udział w Aktywach ogółem", ascending=False, inplace=True
-    )
+        fund_df["Data wyceny"] = report_date
 
-    df.rename(
-        columns={
-            "Standardowy identyfikator subfunduszu": "ID funduszu",
-            "Nazwa subfunduszu": "Nazwa funduszu",
-            "Data wyceny": "Data",
-            "Nazwa emitenta": "Nazwa spółki",
-            "Identyfikator instrumentu - kod ISIN": "ID instrumentu",
-            "Waluta wykorzystywana do wyceny instrumentu": "Waluta",
-            "Procentowy udział w Aktywach ogółem": "Udział [%]",
-        },
-        inplace=True,
-    )
-    df.drop(columns=["Wartość instrumentu w walucie wyceny funduszu"], inplace=True)
+        fund_df = fund_df[
+            [
+                "Standardowy identyfikator subfunduszu",
+                "Nazwa subfunduszu",
+                "Data wyceny",
+                "Nazwa emitenta",
+                "Identyfikator instrumentu - kod ISIN",
+                "Wartość instrumentu w walucie wyceny funduszu",
+            ]
+        ]
+        assets_value = fund_df["Wartość instrumentu w walucie wyceny funduszu"].sum()
 
-    Path("data/output").mkdir(parents=True, exist_ok=True)
-    df.to_excel("data/output/Santander.xlsx", index=False)
+        fund_df["Procentowy udział w Aktywach ogółem"] = fund_df[
+            "Wartość instrumentu w walucie wyceny funduszu"
+        ].apply(lambda x: x / assets_value * 100)
+        fund_df["Procentowy udział w Aktywach ogółem"] = fund_df[
+            "Procentowy udział w Aktywach ogółem"
+        ].apply(lambda x: float(decimal.Decimal(x).quantize(decimal.Decimal("0.01"))))
+        fund_df.sort_values(
+            by="Procentowy udział w Aktywach ogółem", ascending=False, inplace=True
+        )
+
+        fund_df.rename(
+            columns={
+                "Standardowy identyfikator subfunduszu": "ID funduszu",
+                "Nazwa subfunduszu": "Nazwa funduszu",
+                "Data wyceny": "Data",
+                "Nazwa emitenta": "Nazwa spółki",
+                "Identyfikator instrumentu - kod ISIN": "ID instrumentu",
+                "Procentowy udział w Aktywach ogółem": "Udział [%]",
+            },
+            inplace=True,
+        )
+        fund_df.drop(
+            columns=["Wartość instrumentu w walucie wyceny funduszu"], inplace=True
+        )
+
+        Path("data/output").mkdir(parents=True, exist_ok=True)
+        fund_df.to_excel(f"data/output/Santander_{fund_key}.xlsx", index=False)
 
 
 def uniqa():
@@ -175,20 +193,62 @@ def uniqa():
     file_path = "data/input/Publikacja_portfela_FIO_20240930.pdf"
     fund_name = "UNIQA Selektywny Akcji Polskich"
     dfs = tabula.read_pdf(file_path, pages="all")
-    print(len(dfs))
-    print(dfs[0].shape)
-    print(dfs[0].head())
+    df = pd.concat(dfs, ignore_index=True)
+
+    df = df[df["Nazwa subfunduszu"] == fund_name]
+
+    Path("data/output").mkdir(parents=True, exist_ok=True)
+    df.to_excel("data/output/UNIQA.xlsx", index=False)
+
+
+def merge_outputs():
+    print("merge")
+    df = pd.DataFrame()
+    files = Path("data/output").glob("*.xlsx")
+    for f in files:
+        tmp_df = pd.read_excel(f)
+        df = pd.concat([df, tmp_df], ignore_index=True)
+    Path("data/results").mkdir(parents=True, exist_ok=True)
+    df.to_excel("data/results/merged.xlsx", index=False)
+
+    name_dict = dict()
+    for row in df.iterrows():
+        name_dict[row[1]["ID instrumentu"]] = row[1]["Nazwa spółki"]
+
+    df = df.pivot_table(
+        index=["ID instrumentu"],
+        columns=["Nazwa funduszu"],
+        values="Udział [%]",
+        aggfunc="sum",
+    ).reset_index()
+
+    no_columns = len(df.columns)
+    df["Mean [%]"] = df.apply(
+        lambda x: np.nansum([x.iloc[i] for i in range(1, no_columns)])
+        / (no_columns - 1),
+        axis=1,
+    )
+    df["Mean [%]"] = df["Mean [%]"].apply(
+        lambda x: float(decimal.Decimal(x).quantize(decimal.Decimal("0.01")))
+    )
+
+    df.sort_values(by="Mean [%]", ascending=False, inplace=True)
+
+    df["Nazwa spółki"] = df["ID instrumentu"].map(name_dict)
+
+    df.to_excel("data/results/pivot.xlsx", index=False)
+
 
 # paribas()
 # quercus()
 # santander()
 uniqa()
+# merge_outputs()
 
 # TODO dokończyć uniqa
-# TODO dodać santander prestiż alfa
-# TODO przeanalizować historyczne różnice w santanderowych
-# TODO dodać wartość pojedynczego instrumentu
-# TODO dodać market cap/przynaleźność do indeksów
-# TODO dodać podsumowanie/groupby
+# TODO przeanalizować historyczne różnice [wliczając liczbę akcji, wartość danego instrumentu + udział]
+# TODO dodać market cap
+# TODO dodać przynaleźność do indeksów
 # TODO dodać dividend elite
-# TODO round do 2 miejsc
+# TODO dodac własne portfolio
+# TODO dodać słownik ID instrumentu - ticker
