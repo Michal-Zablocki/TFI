@@ -11,8 +11,8 @@ decimal.getcontext().rounding = decimal.ROUND_HALF_UP
 
 def paribas():
     print("paribas")
-    file_path = "data/input/BNP_Paribas_TFI_sklady-portfeli-funduszy_3Q2024.xlsx"
-    sheet_name = "Składy potfeli 3Q 2024"
+    file_path = "data/input/BNP_Paribas_TFI_sklady-portfeli-funduszy_3Q2024.xlsx"  # HC
+    sheet_name = "Składy potfeli 3Q 2024"  # HC
     fund_name = "BNP_Paribas_Malych_i_Srednich_Spolek"
 
     df = pd.read_excel(file_path, sheet_name=sheet_name)
@@ -66,7 +66,7 @@ def paribas():
 
 def quercus():
     print("quercus")
-    file_path = "data/input/QUERCUS_Agresywny_portfel_subfunduszu_20240930.xlsx"
+    file_path = "data/input/QUERCUS_Agresywny_portfel_subfunduszu_20240930.xlsx"  # HC
     sheet_name = "QAGR"
     fund_name = "QUERCUS Agresywny"
 
@@ -82,7 +82,7 @@ def quercus():
     print(df.shape)
 
     df["ID funduszu"] = "quercus_agresywny"
-    df["Data"] = "2024-09-30"
+    df["Data"] = "2024-09-30"  # HC
     df.rename(
         {
             "NAZWA SUBFUNDUSZU": "Nazwa funduszu",
@@ -118,7 +118,7 @@ def quercus():
 def santander():
     print("santander")
     file_path = (
-        "data/input/Santander TFI _ Bieżące składy portfela_pl_1697446468261.xlsx"
+        "data/input/Santander TFI _ Bieżące składy portfela_pl_1697446468261.xlsx"  # HC
     )
     sheet_name = "Zestawienie"
 
@@ -190,12 +190,85 @@ def santander():
 
 def uniqa():
     print("uniqa")
-    file_path = "data/input/Publikacja_portfela_FIO_20240930.pdf"
+    file_path = "data/input/Publikacja_portfela_FIO_20240930.pdf"  # HC
     fund_name = "UNIQA Selektywny Akcji Polskich"
-    dfs = tabula.read_pdf(file_path, pages="all")
-    df = pd.concat(dfs, ignore_index=True)
+    dfs = tabula.read_pdf(file_path, pandas_options={"header": None}, pages="all")
+    df = pd.concat(dfs)
+
+    headers = [
+        "Identyfikator funduszu lub subfunduszu",
+        "Nazwa funduszu",
+        "Nazwa subfunduszu",
+        "Typ funduszu",
+        "Standardowe identyfikatory subfunduszu",
+        "Waluta wyceny aktywów i zobowiązań subfunduszu",
+        "Nazwa emitenta",
+        "Identyfikator instrumentu (kod ISIN)",
+        "Alternatywny identyfikator instrumentu",
+        "Typ instrumentu",
+        "Kategoria instrumentu",
+        "Kraj emitenta",
+        "Waluta instrumentu",
+        "Ilość instrumentów w portfelu",
+        "Wartość instrumentu w walucie wyceny subfunduszu",
+        "Procentowy udział w wartości aktywów ogółem",
+        "Informacje uzupełniające",
+    ]
+
+    if df.shape[1] < len(headers):
+        headers = headers[:-1]
+    df.columns = headers
+
+    Path("data/input").mkdir(parents=True, exist_ok=True)
+    df.to_excel("data/input/UNIQA_agg.xlsx", index=False)
 
     df = df[df["Nazwa subfunduszu"] == fund_name]
+    df = df[df["Typ instrumentu"] == "Akcje"]
+    df = df[df["Waluta wyceny aktywów i zobowiązań subfunduszu"] == "PLN"]
+    df = df[df["Waluta instrumentu"] == "PLN"]
+
+    df["Data wyceny"] = "2024-09-30"  # HC
+
+    df = df[
+        [
+            "Identyfikator funduszu lub subfunduszu",
+            "Nazwa subfunduszu",
+            "Data wyceny",
+            "Nazwa emitenta",
+            "Identyfikator instrumentu (kod ISIN)",
+            "Wartość instrumentu w walucie wyceny subfunduszu",
+        ]
+    ]
+
+    df["Wartość instrumentu w walucie wyceny subfunduszu"] = (
+        df["Wartość instrumentu w walucie wyceny subfunduszu"]
+        .astype(str)
+        .str.replace(",", ".")
+        .astype(float)
+    )
+
+    assets_value = df["Wartość instrumentu w walucie wyceny subfunduszu"].sum()
+
+    df["Procentowy udział w wartości aktywów ogółem"] = df[
+        "Wartość instrumentu w walucie wyceny subfunduszu"
+    ].apply(lambda x: x / assets_value * 100)
+    df.sort_values(
+        by="Procentowy udział w wartości aktywów ogółem", ascending=False, inplace=True
+    )
+
+    df.rename(
+        columns={
+            "Identyfikator funduszu lub subfunduszu": "ID funduszu",
+            "Nazwa subfunduszu": "Nazwa funduszu",
+            "Data wyceny": "Data",
+            "Nazwa emitenta": "Nazwa spółki",
+            "Identyfikator instrumentu (kod ISIN)": "ID instrumentu",
+            "Procentowy udział w wartości aktywów ogółem": "Udział [%]",
+        },
+        inplace=True,
+    )
+
+    df.drop(columns=["Wartość instrumentu w walucie wyceny subfunduszu"], inplace=True)
 
     Path("data/output").mkdir(parents=True, exist_ok=True)
     df.to_excel("data/output/UNIQA.xlsx", index=False)
@@ -239,16 +312,18 @@ def merge_outputs():
     df.to_excel("data/results/pivot.xlsx", index=False)
 
 
-# paribas()
-# quercus()
-# santander()
-uniqa()
-# merge_outputs()
+def main():
+    paribas()
+    quercus()
+    santander()
+    uniqa()
+    merge_outputs()
 
-# TODO dokończyć uniqa
+
+main()
+
 # TODO przeanalizować historyczne różnice [wliczając liczbę akcji, wartość danego instrumentu + udział]
 # TODO dodać market cap
 # TODO dodać przynaleźność do indeksów
 # TODO dodać dividend elite
-# TODO dodac własne portfolio
-# TODO dodać słownik ID instrumentu - ticker
+# TODO dodac własne portfolio (?)
